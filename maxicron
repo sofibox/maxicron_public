@@ -1,0 +1,307 @@
+#!/bin/bash
+# ==================================================
+_APP_SPECIFIC_NAME="Maxicron"
+_APP_VERSION="1.0"
+_APP_STATUS="alpha"
+_APP_INFO="${_APP_SPECIFIC_NAME} is a bash script CLI extension to manage
+cronjob and systemd services"
+_APP_VERSION_STATUS="${_APP_VERSION}-${_APP_STATUS}"
+_AUTHOR="Author: Arafat Ali | Email: arafat@sofibox.com | (C) 2019-2022"
+# ====================================================
+
+# The features:
+# It will disable startup programs and able to create cronjob easily
+# Able to create cronjob with 5 seconds timer which is not available in stock linux cronjob
+# Can enable and disable cronjob easily, can list all cronjobs, delete edit remove
+
+is_service_exists() {
+  local service_name="$1"
+  if systemctl status "${service_name}" 2>/dev/null | grep -Fq "Active:"; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+get_status_message() {
+  local retval
+  retval="$1"
+  if [[ "${retval}" -eq 0 ]]; then
+    echo " [ OK ]"
+  else
+    echo " [ FAILED ]"
+    exit 1
+  fi
+}
+
+repair_services() {
+  :
+}
+
+add_services() {
+  :
+}
+
+enable_service() {
+  local da_service_file service_names check_service_count service_count
+  da_service_file="/usr/local/directadmin/data/admin/services.status"
+  service_count=0
+  # get the list here
+  service_names="$*"
+  echo "[${SCRIPT_NAME}]: List of services to enable:"
+  echo "${service_names[*]}"
+  echo ""
+  for service_name in ${service_names[*]}; do
+    if is_service_exists "${service_name}"; then
+      ((service_count++))
+      echo "[${SCRIPT_NAME}]: ${service_count}) Configuring ${service_name} service ..."
+      echo "======="
+      echo ""
+      # Only do this if DA service file exist (that means DA has installed)
+      if [ -f "${da_service_file}" ]; then
+        echo "[${SCRIPT_NAME}]: Turning on ${service_name} service in Directadmin service monitor ..."
+        check_service_count=$(grep -m1 "^${service_name}=" ${da_service_file})
+        if [[ -n "${check_service_count}" ]]; then
+          # Enable from DA services.status list
+
+          sed -i "s|^${service_name}\=.*|${service_name}=ON|" ${da_service_file}
+          get_status_message "$?"
+          # Extra condition below for a specific service name:
+        else
+          echo "${service_name}=ON" >>"${da_service_file}"
+          get_status_message "$?"
+          # Extra condition below for a specific service name:
+        fi
+      fi
+      echo ""
+      echo "[${SCRIPT_NAME}]: Enabling ${service_name} service startup ..."
+      systemctl enable "${service_name}"
+      get_status_message "$?"
+      echo ""
+      echo "[${SCRIPT_NAME}]: Starting ${service_name} service ..."
+      systemctl start "${service_name}"
+      get_status_message "$?"
+      echo ""
+      # Extra condition below for a specific service name:
+    else
+      echo "[${SCRIPT_NAME}]: [Skipped]: The service name ${service_name} does not exist!"
+      echo ""
+    fi
+  done
+}
+
+disable_services() {
+  local da_service_file service_names check_service_count service_count
+  da_service_file="/usr/local/directadmin/data/admin/services.status"
+  service_count=0
+  # get the list here
+  service_names="$*"
+  echo "[${SCRIPT_NAME}]: List of services to disable:"
+  echo "${service_names[*]}"
+  echo ""
+
+  for service_name in ${service_names[*]}; do
+    if is_service_exists "${service_name}"; then
+      ((service_count++))
+      echo "[${SCRIPT_NAME}]: ${service_count}) Configuring ${service_name} service ..."
+      echo "======="
+      echo ""
+      # Only do this if DA service file exist (that means DA has installed)
+      if [ -f "${da_service_file}" ]; then
+        echo "[${SCRIPT_NAME}]: Turning off ${service_name} service in Directadmin service monitor ..."
+        check_service_count=$(grep -m1 "^${service_name}=" ${da_service_file})
+
+        if [[ -n "${check_service_count}" ]]; then
+          # Disable from DA services.status list
+          sed -i "s|^${service_name}\=.*|${service_name}=OFF|" ${da_service_file}
+          get_status_message "$?"
+          # Extra condition below for a specific service name:
+        else
+          echo "${service_name}=OFF" >>"${da_service_file}"
+          get_status_message "$?"
+          # Extra condition below for a specific service name:
+        fi
+      fi
+      echo ""
+      echo "[${SCRIPT_NAME}]: Disabling ${service_name} service startup ..."
+      systemctl disable "${service_name}"
+      get_status_message "$?"
+      echo ""
+      echo "[${SCRIPT_NAME}]: Stopping ${service_name} service from running ..."
+      systemctl stop "${service_name}"
+      get_status_message "$?"
+      echo ""
+
+      # Extra condition below for a specific service name:
+    else
+      echo "[${SCRIPT_NAME}]: [Skipped]: The service name ${service_name} does not exist!"
+      echo ""
+    fi
+
+  done
+}
+
+# Most common services that shouldn't be running
+stop_some_services() {
+  local da_service_file service_names check_service_count service_count
+  da_service_file="/usr/local/directadmin/data/admin/services.status"
+  service_count=0
+  # change the list here
+  service_names=("clamd" "clamav-daemon" "freshclam" "clamav-freshclam" "da-popb4smtp" "pure-ftpd" "memcached")
+  echo "[${SCRIPT_NAME}]: List of services to disable:"
+  echo "${service_names[*]}"
+  echo ""
+
+  for service_name in "${service_names[@]}"; do
+    if is_service_exists "${service_name}"; then
+      ((service_count++))
+      echo "[${SCRIPT_NAME}]: ${service_count}) Configuring ${service_name} service ..."
+      echo "======="
+      echo ""
+
+      # Only do this if DA service file exist (that means DA has installed)
+      if [ -f "${da_service_file}" ]; then
+        echo "[${SCRIPT_NAME}]: Turning off ${service_name} service in Directadmin service monitor ..."
+        check_service_count=$(grep -m1 "^${service_name}=" ${da_service_file})
+        if [[ -n "${check_service_count}" ]]; then
+          # Disable from DA services.status list
+          sed -i "s|^${service_name}\=.*|${service_name}=OFF|" ${da_service_file}
+          get_status_message "$?"
+          # Extra condition below for a specific service name:
+        else
+          echo "${service_name}=OFF" >>"${da_service_file}"
+          get_status_message "$?"
+          # Extra condition below for a specific service name:
+        fi
+
+      fi
+      echo ""
+      echo "[${SCRIPT_NAME}]: Disabling ${service_name} service startup ..."
+      systemctl disable "${service_name}"
+      get_status_message "$?"
+      echo ""
+      echo "[${SCRIPT_NAME}]: Stopping ${service_name} service from running ..."
+      systemctl stop "${service_name}"
+      get_status_message "$?"
+      echo ""
+
+      # Extra condition below for a specific service name:
+    else
+      echo "[${SCRIPT_NAME}]: [Skipped]: The service name ${service_name} does not exist!"
+      echo ""
+    fi
+
+  done
+}
+
+status_service() {
+  local service_name retval
+  service_name="$1"
+  retval=0
+  systemctl --no-pager status "${service_name}"
+  retval="$?"
+  return ${retval}
+}
+
+ADMIN_EMAIL="webmaster@sofibox.com"
+SCRIPT_PATH="$(dirname "$(readlink -f "$0")")"
+SCRIPT_NAME=$(basename -- "$0")
+BOX_HOSTNAME=$(hostname)
+MAIL_BIN=$(command -v mail)
+
+LOG_PATH="${SCRIPT_PATH}/log"
+CONFIG_PATH="${SCRIPT_PATH}/conf"
+DB_PATH="${SCRIPT_PATH}/db"
+TEMP_PATH="${SCRIPT_PATH}/tmp"
+CODE_PATH="${SCRIPT_PATH}/code"
+
+mkdir -p "${LOG_PATH}"
+mkdir -p "${CONFIG_PATH}"
+mkdir -p "${DB_PATH}"
+mkdir -p "${TEMP_PATH}"
+mkdir -p "${CODE_PATH}"
+
+# REPORT FILES
+DATE_TIME_NOW="$(date '+%d-%m-%Y_%H-%M-%S')" #31-03-2020_11-56-16
+#MONTH_NOW=$(date +%B)
+#DATE_NOW="$(date '+%d-%m-%Y')" #31-03-2020
+REPORT_FILE="${LOG_PATH}/${SCRIPT_NAME}-${DATE_TIME_NOW}-report.log"
+
+# STATUS VARIABLE
+RUN_MODE="N/A"
+WARN_STATUS="OK"
+RETVAL=1
+
+ACTION="$1"
+ARGNUM="$#"
+
+if [ ${ARGNUM} -eq 0 ]; then
+  echo "[${SCRIPT_NAME}]: Error, no argument is supplied. Use [ ${SCRIPT_NAME} --help ] to see the valid options"
+  exit 2
+fi
+
+while [ "${ARGNUM}" -gt 0 ]; do
+  case "${ACTION}" in
+  # Display help and usage
+  -h | --help | help | /? | ?)
+    usage
+    exit 0
+    ;;
+  # Display Program version
+  -v | -V | --version | version | ver)
+    echo "${_APP_INFO}"
+    echo ""
+    echo "Script version: ${_APP_SPECIFIC_NAME}-${_APP_VERSION_STATUS}"
+    echo "${_AUTHOR}"
+    exit 0
+    break
+    ;;
+  # maxicron --stop-some-services (stop predefined services)
+  sss | stop-some-services | disable-some-services)
+    shift
+    stop_some_services "$@"
+    exit 0
+    break
+    ;;
+  -x | --disable-service | --disable-services | disable-service | disable-services | stop)
+    shift
+    disable_services "$@"
+    exit 0
+    break
+    ;;
+  -e | --enable-service | --enable-services | enable-service | enable-services | enable)
+    shift
+    enable_service "$@"
+    exit 0
+    break
+    ;;
+  -s | --status | status)
+    shift
+    status_service "$@"
+    exit 0
+    break
+    ;;
+  -a | --add-service | --add-services | add-service | add-services | create-service | create-services)
+    shift
+    add_service "$@"
+    exit 0
+    break
+    ;;
+  # For self script editing purpose
+  edit-self | edit-script | edit-code | update-code | show-script | editself | editscript | editcode | updatecode | showscript | edit)
+    nano -c "${SCRIPT_PATH}/${SCRIPT_NAME}"
+    exit 0
+    break
+    ;;
+  --)
+    break
+    ;;
+  -*)
+    echo "[${SCRIPT_NAME}]: Invalid option: [ ${ACTION} ]. Use --help to see the valid options"
+    exit 1
+    ;;
+  *) ;;
+  esac
+  echo "[${SCRIPT_NAME}]: Error, invalid action: [ ${ACTION} ]. Use --help to see the valid actions"
+  exit 1
+done
